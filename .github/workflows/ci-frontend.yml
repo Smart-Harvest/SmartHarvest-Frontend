@@ -13,7 +13,7 @@ permissions:
 
 jobs:
 
-  # PR Floww
+  # PR FLOW
  
   sast:
     if: github.event_name == 'pull_request'
