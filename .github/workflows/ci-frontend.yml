@@ -101,7 +101,7 @@ jobs:
   cd:
     needs: [publish]
     if: needs.publish.result == 'success'
-    uses: Smart-Harvest/SmartHarvest-workflows/.github/workflows/_cd-template.yml@feature/templates
+    uses: Smart-Harvest/SmartHarvest-workflows/.github/workflows/_cd-template.yml@develop
     with:
       service-name: frontend-service
       image-tag: ${{ github.event.release.tag_name }}
