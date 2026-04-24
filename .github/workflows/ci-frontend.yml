@@ -17,7 +17,7 @@ jobs:
  
   sast:
     if: github.event_name == 'pull_request'
-    uses: Smart-Harvest/SmartHarvest-workflows/.github/workflows/_sast.yml@v2.0.0
+    uses: Smart-Harvest/SmartHarvest-workflows/.github/workflows/_sast.yml@develop
     with:
       service-path: .
     secrets:
@@ -27,7 +27,7 @@ jobs:
   sca:
     needs: [sast]
     if: github.event_name == 'pull_request'
-    uses: Smart-Harvest/SmartHarvest-workflows/.github/workflows/_sca.yml@v2.0.0
+    uses: Smart-Harvest/SmartHarvest-workflows/.github/workflows/_sca.yml@develop
     with:
       service-name: frontend-service
       service-path: .
@@ -38,7 +38,7 @@ jobs:
   trivy:
     needs: [sca]
     if: github.event_name == 'pull_request'
-    uses: Smart-Harvest/SmartHarvest-workflows/.github/workflows/_docker-build.yml@v2.0.0
+    uses: Smart-Harvest/SmartHarvest-workflows/.github/workflows/_docker-build.yml@develop
     with:
       service-name: user-service
       service-path: .
