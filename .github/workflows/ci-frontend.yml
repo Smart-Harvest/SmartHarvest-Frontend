@@ -23,7 +23,7 @@ jobs:
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_URL: ${{ secrets.SONAR_URL }}
-
+#sca
   sca:
     needs: [sast]
     if: github.event_name == 'pull_request'
