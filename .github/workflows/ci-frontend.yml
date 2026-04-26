@@ -40,7 +40,7 @@ jobs:
     if: github.event_name == 'pull_request'
     uses: Smart-Harvest/SmartHarvest-workflows/.github/workflows/_docker-build.yml@develop
     with:
-      service-name: user-service
+      service-name: frontend-service
       service-path: .
 
   #  SINGLE PR CHECK
@@ -65,7 +65,7 @@ jobs:
 
       - name: Set image tag
         run: |
-          IMAGE="${{ secrets.DOCKER_USERNAME }}/user-service:dev-${{ github.sha }}"
+          IMAGE="${{ secrets.DOCKER_USERNAME }}/frontend-service:dev-${{ github.sha }}"
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
 
       - name: Docker login
@@ -87,7 +87,7 @@ jobs:
 
       - name: Set release tag
         run: |
-          IMAGE="${{ secrets.DOCKER_USERNAME }}/user-service:${{ github.event.release.tag_name }}"
+          IMAGE="${{ secrets.DOCKER_USERNAME }}/frontend-service:${{ github.event.release.tag_name }}"
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
 
       - name: Docker login
