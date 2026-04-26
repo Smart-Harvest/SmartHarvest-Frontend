@@ -1,38 +1,32 @@
-# ════════════════════════════════════════════════════════════
-# SmartHarvest — Frontend Service CI/CD
-# ════════════════════════════════════════════════════════════
-# PR:      code-quality + trivy scan (soft) → STOP
-# develop: code-quality + trivy scan (strict) → publish → cd (values-dev.yaml)
-# main:    retag SHA→semver (NO rebuild) → cd (values-prod.yaml)
-# ════════════════════════════════════════════════════════════
-name: CI/CD — Frontend Service
+name: CI/CD - frontend Service
 
 on:
   push:
     branches: [develop, main]
   pull_request:
     branches: [develop, main]
+  release:
+    types: [created]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
 
-  # ═══════════════════════════════════════════════════════════
-  # 1. CODE QUALITY (PR + develop only)
-  # ═══════════════════════════════════════════════════════════
+  # PR FLOW
+ 
   sast:
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/develop')
+    if: github.event_name == 'pull_request'
     uses: Smart-Harvest/SmartHarvest-workflows/.github/workflows/_sast.yml@develop
     with:
       service-path: .
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_URL: ${{ secrets.SONAR_URL }}
-
+#sca
   sca:
     needs: [sast]
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/develop')
+    if: github.event_name == 'pull_request'
     uses: Smart-Harvest/SmartHarvest-workflows/.github/workflows/_sca.yml@develop
     with:
       service-name: frontend-service
@@ -41,94 +35,76 @@ jobs:
     secrets:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-  # ═══════════════════════════════════════════════════════════
-  # 2. DOCKER BUILD + TRIVY SCAN
-  # ═══════════════════════════════════════════════════════════
-
-  # PR — soft scan (fail-on-critical=0)
-  trivy-pr:
+  trivy:
     needs: [sca]
     if: github.event_name == 'pull_request'
     uses: Smart-Harvest/SmartHarvest-workflows/.github/workflows/_docker-build.yml@develop
     with:
       service-name: frontend-service
       service-path: .
-      fail-on-critical: "0"
 
-  # develop — strict scan (fail-on-critical=1)
-  trivy-develop:
-    needs: [sca]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-    uses: Smart-Harvest/SmartHarvest-workflows/.github/workflows/_docker-build.yml@develop
-    with:
-      service-name: frontend-service
-      service-path: .
-      #fail-on-critical: "1"
-
-  # ═══════════════════════════════════════════════════════════
-  # 3. PR QUALITY GATE
-  # ═══════════════════════════════════════════════════════════
+  #  SINGLE PR CHECK
   pr-check:
     name: PR Quality Gate
-    needs: [sast, sca, trivy-pr]
+    needs: [sast, sca, trivy]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - run: echo "✅ All PR checks passed"
+      - run: echo "All checks passed"
 
-  # ═══════════════════════════════════════════════════════════
-  # 4. DOCKER PUBLISH
-  # ═══════════════════════════════════════════════════════════
 
-  # develop — build + push SHA-tagged image
-  publish-develop:
-    needs: [trivy-develop]
+  # DEVELOP (AFTER MERGE)
+
+
+  dev-publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-    uses: Smart-Harvest/SmartHarvest-workflows/.github/workflows/_docker-publish.yml@develop
-    with:
-      service-name: frontend-service
-      service-path: .
-      environment: develop
-    secrets:
-      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+    runs-on: ubuntu-latest
 
-  # main — pull SHA image → retag to semver → push (NO rebuild)
-  publish-main:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    uses: Smart-Harvest/SmartHarvest-workflows/.github/workflows/_docker-publish.yml@develop
-    with:
-      service-name: frontend-service
-      service-path: .
-      environment: main
-    secrets:
-      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
 
-  # ═══════════════════════════════════════════════════════════
-  # 5. CD — Update Helm Values (triggers ArgoCD auto-sync)
-  # ═══════════════════════════════════════════════════════════
+      - name: Set image tag
+        run: |
+          IMAGE="${{ secrets.DOCKER_USERNAME }}/frontend-service:dev-${{ github.sha }}"
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
 
-  # develop → values/values-dev.yaml
-  cd-develop:
-    needs: [publish-develop]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+      - name: Docker login
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build & Push
+        run: |
+          docker build -t $IMAGE .
+          docker push $IMAGE
+
+  #  RELEASE (MAIN ONLY)
+
+  publish:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set release tag
+        run: |
+          IMAGE="${{ secrets.DOCKER_USERNAME }}/frontend-service:${{ github.event.release.tag_name }}"
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: Docker login
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build & Push
+        run: |
+          docker build -t $IMAGE .
+          docker push $IMAGE
+
+  cd:
+    needs: [publish]
+    if: needs.publish.result == 'success'
     uses: Smart-Harvest/SmartHarvest-workflows/.github/workflows/_cd-template.yml@develop
     with:
       service-name: frontend-service
-      image-tag: dev-${{ github.sha }}
-      environment: develop
-    secrets:
-      HELM_REPO_PAT: ${{ secrets.HELM_REPO_PAT }}
-
-  # main → values/values-prod.yaml
-  cd-main:
-    needs: [publish-main]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    uses: Smart-Harvest/SmartHarvest-workflows/.github/workflows/_cd-template.yml@develop
-    with:
-      service-name: frontend-service
-      image-tag: ${{ needs.publish-main.outputs.image-tag }}
+      image-tag: ${{ github.event.release.tag_name }}
       environment: main
     secrets:
       HELM_REPO_PAT: ${{ secrets.HELM_REPO_PAT }}

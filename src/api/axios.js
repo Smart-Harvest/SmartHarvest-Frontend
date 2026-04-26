@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-const USER_API = import.meta.env.VITE_USER_API || 'http://localhost:8001';
-const CROP_API = import.meta.env.VITE_CROP_API || 'http://localhost:8002';
-const MARKET_API = import.meta.env.VITE_MARKET_API || 'http://localhost:8003';
+const USER_API = import.meta.env.VITE_USER_API || '';
+const CROP_API = import.meta.env.VITE_CROP_API || '';
+const MARKET_API = import.meta.env.VITE_MARKET_API || '';
 
 function createApi(baseURL) {
   const instance = axios.create({ baseURL });
