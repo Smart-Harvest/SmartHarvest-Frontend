@@ -98,6 +98,17 @@ jobs:
           docker build -t $IMAGE .
           docker push $IMAGE
 
+  cd-develop:
+    needs: [dev-publish]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    uses: Smart-Harvest/SmartHarvest-workflows/.github/workflows/_cd-template.yml@develop
+    with:
+      service-name: frontend-service
+      image-tag: dev-${{ github.sha }}
+      environment: develop
+    secrets:
+      HELM_REPO_PAT: ${{ secrets.HELM_REPO_PAT }}
+
   cd:
     needs: [publish]
     if: needs.publish.result == 'success'
